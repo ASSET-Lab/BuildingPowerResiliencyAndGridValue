@@ -1,0 +1,53 @@
+#!/bin/bash
+
+#SBATCH --job-name=macrocemruns
+#SBATCH --nodes=1
+#SBATCH --cpus-per-task=2
+#SBATCH --ntasks-per-node=1
+#SBATCH --mem-per-cpu=100GB 
+#SBATCH --time=72:00:00
+#SBATCH --mail-type=END,FAIL
+#SBATCH --account=mtcraig1
+#SBATCH --partition=largemem
+
+module load python3.9-anaconda/2021.11
+source /home/mtcraig/MacroCEM/env/bin/activate
+module load RestrictedLicense cplex/20.1.0
+export PYTHONPATH=/home/mtcraig/gams40_3/apifiles/Python/api_39
+export PYTHONPATH=/home/mtcraig/gams40_3/apifiles/Python/gams:$PYTHONPATH
+
+#set inputs to Python script
+wsGen=$1
+wsGenYr=$2
+co2Cap=$3
+co2CapYr=$4	
+forceBldgUp=$5
+
+echo "Running: $wsGen $wsGenYr $co2Cap $co2CapYr"
+
+#echo commands to stdout
+set -x
+
+#set working dir
+export TMPDIR=$(mktemp -d /tmp/mtcraig.$SLURM_JOBID.XXXXXX)
+echo "Temporary directory: $TMPDIR"
+cd $TMPDIR
+
+#copy files to working directory
+cp -rf /home/mtcraig/MacroCEMJill/Python/* $TMPDIR
+
+#run script with inputs
+python $TMPDIR/RunMacroCEM.py $wsGen $wsGenYr $co2Cap $co2CapYr $forceBldgUp
+
+#copy output folder to persistent space
+resultsFolder="NYrcp45hotterRPS"$wsGen"RY"$wsGenYr"CO2"$co2Cap"CY"$co2CapYr"Up"$forceBldgUp
+echo "Results directory: $resultsFolder"
+cp -rf $TMPDIR/$resultsFolder/ /nfs/turbo/seas-mtcraig/mtcraig/MacroCEMResults/JillPaper/
+
+#go back to home
+cd
+
+#remove temporary directory
+rm -rf $TMPDIR
+
+exit
